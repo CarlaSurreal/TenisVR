@@ -1,84 +1,48 @@
 using UnityEngine;
-using TMPro;
-using System.Collections;
 
+[RequireComponent(typeof(Collider))]
 public class RacketController : MonoBehaviour
 {
-    [Header("Potencia del golpe")]
-    public float hitPowerMultiplier = 6f;
-    public float heightBoost = 1.5f;
-    private float randomness = 0.015f;
-    private float spinMultiplier = 0f;
+    [Header("Parámetros de Golpe")]
+    public float powerMultiplier = 2.8f;      // Escala la velocidad de la raqueta
+    public float maxSpeed = 11f;              // Velocidad máxima que puede alcanzar la bola
+    public float minSwingSpeed = 0.25f;       // Umbral mínimo para que el golpe cuente
+    public float upwardLimit = 0.35f;         // Máximo valor vertical permitido
 
-    public AudioSource hitSound;
-    [SerializeField] private TextMeshProUGUI hitFeedbackText;
+    private Vector3 previousPosition;
+    private Vector3 swingVelocity;
 
-    private Vector3 lastPosition;
-    private Vector3 racketVelocity;
-
-    private void Start()
+    void Start()
     {
-        lastPosition = transform.position;
-        if (hitFeedbackText != null)
-            hitFeedbackText.gameObject.SetActive(false);
+        previousPosition = transform.position;
     }
 
-    private void Update()
+    void Update()
     {
-        racketVelocity = (transform.position - lastPosition) / Time.deltaTime;
-        lastPosition = transform.position;
+        swingVelocity = (transform.position - previousPosition) / Time.deltaTime;
+        previousPosition = transform.position;
     }
 
-    private void OnTriggerEnter(Collider other)
+    private void OnCollisionEnter(Collision collision)
     {
-        if (!other.CompareTag("Ball")) return;
+        if (!collision.gameObject.CompareTag("Ball")) return;
 
-        Rigidbody ballRb = other.GetComponent<Rigidbody>();
+        Rigidbody ballRb = collision.gameObject.GetComponent<Rigidbody>();
         if (ballRb == null) return;
 
-        // Dirección base
-        Vector3 hitDir = racketVelocity.normalized;
+        float swingSpeed = swingVelocity.magnitude;
 
-        // Variación leve
-        hitDir += new Vector3(
-            Random.Range(-randomness, randomness),
-            Random.Range(-randomness, randomness),
-            Random.Range(-randomness, randomness)
-        );
-        hitDir = hitDir.normalized;
+        if (swingSpeed < minSwingSpeed) return; // ignorar si mueves poco la raqueta
 
-        // Aumento vertical
-        hitDir.y += heightBoost;
+        // Ajustamos dirección para controlar tiros exageradamente verticales
+        Vector3 direction = swingVelocity.normalized;
+        direction.y = Mathf.Clamp(direction.y, -0.1f, upwardLimit);
+        direction.Normalize();
 
-        // Aplica fuerza con AddForce (respetando física)
-        float force = racketVelocity.magnitude * hitPowerMultiplier;
-        ballRb.AddForce(hitDir.normalized * force, ForceMode.VelocityChange);
+        // Calculamos la velocidad final de la bola
+        float finalSpeed = Mathf.Min(swingSpeed * powerMultiplier, maxSpeed);
+        ballRb.linearVelocity = direction * finalSpeed;
 
-        // Spin (opcional)
-        float verticalSpeed = racketVelocity.y;
-        Vector3 spinAxis = transform.right;
-        float spinAmount = -verticalSpeed * spinMultiplier;
-        ballRb.AddTorque(spinAxis * spinAmount, ForceMode.VelocityChange);
-
-        // Feedback
-        if (hitSound != null) hitSound.Play();
-        ShowHitFeedback("Good");
-    }
-
-    private void ShowHitFeedback(string msg)
-    {
-        if (hitFeedbackText != null)
-        {
-            hitFeedbackText.text = msg;
-            hitFeedbackText.gameObject.SetActive(true);
-            StartCoroutine(HideFeedbackAfterDelay(0.5f));
-        }
-    }
-
-    private IEnumerator HideFeedbackAfterDelay(float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        if (hitFeedbackText != null)
-            hitFeedbackText.gameObject.SetActive(false);
+        Debug.DrawRay(transform.position, direction * finalSpeed, Color.green, 1f);
     }
 }

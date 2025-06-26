@@ -8,6 +8,8 @@ TagManager:
   - Ball
   - wall
   - floor
+  - Out
+  - In
   layers:
   - Default
   - TransparentFX
@@ -15,7 +17,7 @@ TagManager:
   - 
   - Water
   - UI
-  - 
+  - Ball
   - 
   - 
   - 
